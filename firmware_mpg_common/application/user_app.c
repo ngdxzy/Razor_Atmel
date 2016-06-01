@@ -88,6 +88,21 @@ Promises:
 */
 void UserAppInitialize(void)
 {
+   /* All discrete LEDs to off */
+  LedOff(WHITE);
+  LedOff(PURPLE);
+  LedOff(BLUE);
+  LedOff(CYAN);
+  LedOff(GREEN);
+  LedOff(YELLOW);
+  LedOff(ORANGE);
+  LedOff(RED);
+  
+  /* Backlight to white */  
+  LedOn(LCD_RED);
+  LedOn(LCD_GREEN);
+  LedOn(LCD_BLUE);
+  
   
   /* If good initialization, set state to Idle */
   if( 1 )
@@ -137,9 +152,112 @@ State Machine Function Definitions
 /* Wait for a message to be queued */
 static void UserAppSM_Idle(void)
 {
-    
+  static u16 u16BlinkCounter = 0;
+  static u8 u8ColorIndex = 0;
+  static bool u8Flag = 1;
+  static LedNumberType aeCurrentLed[]  = {WHITE, PURPLE, BLUE, CYAN, GREEN, YELLOW, ORANGE, RED};
+  u16BlinkCounter++;
+  if(u16BlinkCounter == 333)
+  {
+    u16BlinkCounter = 0;
+    /* Set direction */
+    if(u8Flag)
+    {
+      u8ColorIndex++;
+      if(u8ColorIndex == 7)
+        u8Flag = 0;
+    }
+    else
+    {
+      u8ColorIndex--;
+      if(u8ColorIndex == 0)
+        u8Flag = 1;
+    }
+    /* Set leds according to state */
+
+    switch(u8ColorIndex)
+    {
+    case 0:
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],15);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+1],5);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+2],1);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+3],0);
+           break;
+     case 1:if(u8Flag)
+          {
+            LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],20);
+            LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-1],5);
+            LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+1],0);
+          }
+         else
+          {
+            LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],15);
+            LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+1],5);
+            LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+2],1);
+            LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+3],0);
+          }
+          break;
+     case 2:
+       if(u8Flag)
+            {
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],15);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-1],5);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-2],1);
+            }
+           else
+            {
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],15);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+1],5);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+2],1);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+3],0);
+            }
+           break;
+     case 3:
+     case 4:
+     case 5:if(u8Flag)
+            {
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],15);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-1],5);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-2],1);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-3],0);
+            }
+           else
+            {
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],15);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+1],5);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+2],1);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+3],0);
+            }
+           break;
+      case 6:if(u8Flag)
+            {
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],15);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-1],5);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-2],1);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-3],0);
+            }
+           else
+            {
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],20);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex+1],5);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-1],0);
+            }
+           break;
+     case 7:
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex],15);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-1],5);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-2],1);
+              LedPWM((LedNumberType)aeCurrentLed[u8ColorIndex-3],0);
+           break;
+     default:if(u8Flag)
+            {}
+           else
+            {}
+           break;
+    }
+  }
 } /* end UserAppSM_Idle() */
-     
+
 
 /*-------------------------------------------------------------------------------------------------------------------*/
 /* Handle an error */
