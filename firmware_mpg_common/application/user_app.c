@@ -88,7 +88,14 @@ Promises:
 */
 void UserAppInitialize(void)
 {
-  
+  LedOff(WHITE);
+  LedOff(PURPLE);
+  LedOff(BLUE);
+  LedOff(CYAN);
+  LedOff(GREEN);
+  LedOff(YELLOW);
+  LedOff(ORANGE);
+  LedOff(RED);
   /* If good initialization, set state to Idle */
   if( 1 )
   {
@@ -137,7 +144,35 @@ State Machine Function Definitions
 /* Wait for a message to be queued */
 static void UserAppSM_Idle(void)
 {
+    static u16 u16LedBlinkFrequence = 500;
+    static bool boolYellowOn = 0;
+    if( WasButtonPressed(BUTTON1) )
+    {
+      ButtonAcknowledge(BUTTON1);
+      /* The button is currently pressed, so make sure the LED is on */
+      LedToggle(PURPLE);
+    }
     
+    if( WasButtonPressed(BUTTON2) )
+    {
+      ButtonAcknowledge(BUTTON2);
+      LedToggle(BLUE);
+      /* The button is currently pressed, so make sure the LED is on */
+      if(!boolYellowOn)
+      {
+        LedOn(YELLOW);
+        boolYellowOn = 1;
+      }
+      else
+      {
+         u16LedBlinkFrequence /= 2;
+         if(u16LedBlinkFrequence < 125 && u16LedBlinkFrequence > 60)
+           u16LedBlinkFrequence = 63;
+         else if(u16LedBlinkFrequence < 63)
+           u16LedBlinkFrequence = 500;
+         LedBlink(YELLOW,u16LedBlinkFrequence);
+      }
+    }
 } /* end UserAppSM_Idle() */
      
 
