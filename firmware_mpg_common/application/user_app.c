@@ -164,12 +164,12 @@ static void UserAppSM_Idle(void)
     la1,OneM,mi1,OneM,re1,DouM,la1,OneM,mi1,OneM,re1,DouM,
     la1,OneM,mi1,OneM,re1,OneM+HalfM,do1,HalfM,do1,DouM+OneM+HalfM,
     quite,DouM+OneM,
-    mi1,HalfM,re1,HalfM,so1,DouM+OneM,fa1,HalfM,mi1,HalfM,re1,HalfM+DouM,
+    mi1,HalfM,re1,HalfM,so1,DouM+OneM,fa1,HalfM,mi1,HalfM,re1,HalfM+DouM,quite,QuarM,
     so1,HalfM,fa1,HalfM,mi1,OneM,fa1,HalfM,so1,HalfM+OneM,mi1,OneM,re1,DouM+OneM,
     quite,HalfM,do1,HalfM,la,OneM,mi1,OneM,re1,OneM+HalfM,
     do1,HalfM,so,OneM,re1,OneM,do1,DouM-QuarM,quite,QuarM,
     fa1,HalfM,mi1,HalfM,fa1,HalfM,mi1,HalfM,do1,OneM+HalfM,quite,QuarM,
-    fa1,HalfM,mi1,HalfM,fa1,HalfM,mi1,HalfM,do1,OneM+HalfM,re1,DouM,do1,DouM+DouM,
+    fa1,HalfM,mi1,HalfM,fa1,HalfM,mi1,HalfM,do1,OneM+HalfM,re1,DouM-QuarM,do1,DouM+DouM,
     quite,DouM*3
     };
   static u16 u16SizeOfMusic = sizeof(u16MusicData)/2;
