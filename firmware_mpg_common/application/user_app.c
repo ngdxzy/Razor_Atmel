@@ -88,7 +88,8 @@ Promises:
 */
 void UserAppInitialize(void)
 {
-  
+  PWMAudioSetFrequency(BUZZER1, 0);
+  PWMAudioOn(BUZZER1);
   /* If good initialization, set state to Idle */
   if( 1 )
   {
@@ -135,9 +136,71 @@ State Machine Function Definitions
 
 /*-------------------------------------------------------------------------------------------------------------------*/
 /* Wait for a message to be queued */
+#define quite 0
+#define do 440
+#define re 493
+#define mi 554
+#define fa 587
+#define so 659
+#define la 739
+#define si 830
+#define do1 440*2
+#define re1 493*2
+#define mi1 554*2
+#define fa1 587*2
+#define so1 659*2
+#define la1 739*2
+#define si1 830*2
+#define Meter 500
+#define OneM Meter
+#define HalfM Meter/2
+#define QuarM Meter/4
+#define DouM Meter*2
 static void UserAppSM_Idle(void)
 {
-    
+  static u16 u16MusicData[]={
+    mi1,OneM, mi1,HalfM,  mi1,HalfM,  fa1,OneM, so1,OneM, mi1,DouM, re1,DouM,
+    do1,OneM,do1,HalfM,do1,HalfM,re1,OneM,mi1,OneM,mi1,DouM,si,DouM,
+    la1,OneM,mi1,OneM,re1,DouM,la1,OneM,mi1,OneM,re1,DouM,
+    la1,OneM,mi1,OneM,re1,OneM+HalfM,do1,HalfM,do1,DouM+OneM+HalfM,
+    quite,DouM+OneM,
+    mi1,HalfM,re1,HalfM,so1,DouM+OneM,fa1,HalfM,mi1,HalfM,re1,HalfM+DouM,
+    so1,HalfM,fa1,HalfM,mi1,OneM,fa1,HalfM,so1,HalfM+OneM,mi1,OneM,re1,DouM+OneM,
+    quite,HalfM,do1,HalfM,la,OneM,mi1,OneM,re1,OneM+HalfM,
+    do1,HalfM,so,OneM,re1,OneM,do1,DouM-QuarM,quite,QuarM,
+    fa1,HalfM,mi1,HalfM,fa1,HalfM,mi1,HalfM,do1,OneM+HalfM,quite,QuarM,
+    fa1,HalfM,mi1,HalfM,fa1,HalfM,mi1,HalfM,do1,OneM+HalfM,re1,DouM,do1,DouM+DouM,
+    quite,DouM*3
+    };
+  static u16 u16SizeOfMusic = sizeof(u16MusicData)/2;
+  static u16 u16Timecounter = 0;
+  static u8 u8PresentSound = 0;
+  static bool bFlag = 1;
+  u16Timecounter++;
+  /* Just set initial statement */
+  if(bFlag)
+  {
+    bFlag = 0;
+    u8PresentSound = 1;
+    PWMAudioSetFrequency(BUZZER1, u16MusicData[u8PresentSound-1]);
+  }
+  /* quite down at the end of one sound so that the music can have more rhythm sensation*/
+  if(u16Timecounter == u16MusicData[u8PresentSound]-50)
+    PWMAudioSetFrequency(BUZZER1,quite);
+  /* Control the last time of per sound*/
+  if(u16Timecounter == u16MusicData[u8PresentSound])
+  {
+    u16Timecounter = 0;
+    u8PresentSound++;
+    /* When the music ends,restart */
+    if(u8PresentSound == u16SizeOfMusic)
+    {
+      u8PresentSound = 0;
+      PWMAudioSetFrequency(BUZZER1, u16MusicData[u8PresentSound]);
+    }
+    PWMAudioSetFrequency(BUZZER1, u16MusicData[u8PresentSound]);
+    u8PresentSound++;
+  }
 } /* end UserAppSM_Idle() */
      
 
