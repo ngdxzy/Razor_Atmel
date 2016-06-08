@@ -28,8 +28,19 @@ Type Definitions
 /**********************************************************************************************************************
 Constants / Definitions
 **********************************************************************************************************************/
+/* Required constants for ANT channel configuration */
+#define ANT_CHANNEL_USERAPP             (u8)0                 
+#define ANT_SERIAL_LO_USERAPP           (u8)0xCF                 
+#define ANT_SERIAL_HI_USERAPP           (u8)0x17                 
+#define ANT_DEVICE_TYPE_USERAPP         (u8)1                 
+#define ANT_TRANSMISSION_TYPE_USERAPP   (u8)1                 
+#define ANT_CHANNEL_PERIOD_LO_USERAPP   (u8)0x00              
+#define ANT_CHANNEL_PERIOD_HI_USERAPP   (u8)0x20              
+#define ANT_FREQUENCY_USERAPP           (u8)50                
+#define ANT_TX_POWER_USERAPP            RADIO_TX_POWER_0DBM
 
 
+#define TIMEOUT_VALUE                   (u32)3000   //Time in ms for state time out
 /**********************************************************************************************************************
 Function Declarations
 **********************************************************************************************************************/
@@ -55,11 +66,11 @@ void UserAppRunActiveState(void);
 State Machine Declarations
 ***********************************************************************************************************************/
 static void UserAppSM_Idle(void);    
-
+static void UserAppSM_WaitChannelOpen(void);
 static void UserAppSM_Error(void);         
 static void UserAppSM_FailedInit(void);        
-
-
+static void UserAppSM_WaitChannelClose(void);
+static void UserAppSM_ChannelOpen(void);
 #endif /* __USER_APP_H */
 
 
