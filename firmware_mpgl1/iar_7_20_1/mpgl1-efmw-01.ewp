@@ -2033,6 +2033,9 @@
     <group>
       <name>Include</name>
       <file>
+        <name>$PROJ_DIR$\..\..\firmware_mpg_common\application\Command.h</name>
+      </file>
+      <file>
         <name>$PROJ_DIR$\..\..\firmware_mpg_common\application\debug.h</name>
       </file>
       <file>
@@ -2047,6 +2050,9 @@
     </group>
     <group>
       <name>Source</name>
+      <file>
+        <name>$PROJ_DIR$\..\..\firmware_mpg_common\application\Command.c</name>
+      </file>
       <file>
         <name>$PROJ_DIR$\..\..\firmware_mpg_common\application\debug.c</name>
       </file>
