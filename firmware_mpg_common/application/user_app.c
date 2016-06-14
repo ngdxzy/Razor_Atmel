@@ -35,7 +35,7 @@ Runs current task state.  Should only be called once in main loop.
 **********************************************************************************************************************/
 
 #include "configuration.h"
-
+#include "Command.h"
 /***********************************************************************************************************************
 Global variable definitions with scope across entire project.
 All Global variable names shall start with "G_"
@@ -63,15 +63,17 @@ extern volatile u32 G_u32ApplicationFlags;             /* From main.c */
 extern volatile u32 G_u32SystemTime1ms;                /* From board-specific source file */
 extern volatile u32 G_u32SystemTime1s;                 /* From board-specific source file */
 
-
+extern volatile CMD sPresentCMD;
 /***********************************************************************************************************************
 Global variable definitions with scope limited to this local application.
 Variable names shall start with "UserApp_" and be declared as static.
 ***********************************************************************************************************************/
 static fnCode_type UserApp_StateMachine;            /* The state machine function pointer */
 static u32 UserApp_u32Timeout;                      /* Timeout counter used across states */
-static u8 u8PairedCount = 1;
+
 static u8 u8AntState = 0xff;
+
+u8 u8PairedCount = 1;
 /**********************************************************************************************************************
 Function Definitions
 **********************************************************************************************************************/
@@ -117,11 +119,10 @@ void UserAppInitialize(void)
   G_stAntSetupData.AntFrequency        = ANT_FREQUENCY_USERAPP;
   G_stAntSetupData.AntTxPower          = ANT_TX_POWER_USERAPP;
 
-  
+
   /* If good initialization, set state to Idle */
   if( AntChannelConfig(ANT_MASTER) )
   {
-    AntOpenChannel();
     UserApp_StateMachine = UserAppSM_Close;
   }
   else
@@ -159,14 +160,11 @@ void UserAppRunActiveState(void)
 /*--------------------------------------------------------------------------------------------------------------------*/
 static void UserApp_SendMessage()
 {
-  static u8 u8LastState = 0xff;
-  static u8 au8TestMessage[] = {0, 0, 0, 0, 0xA5, 0, 0, 0};
-  u8 au8DataContent[] = "xxxxxxxxxxxxxxxx";
-  static u8 au8LastAntData[ANT_APPLICATION_MESSAGE_BYTES] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-  bool bGotNewData;
-  
-  
-  
+  static u8 u8SendBuf[] = {0,0,0,0,0,0,0,0};
+  static u8 au8DataContent[] = "xxxxxxxxxxxxxxxx";
+  static bool bIsFirstMsg = 1;
+  u8 u8MsgPlace = 0;
+  static u8 u8CMDCp = 0;
   if( AntReadData() )
   {
      /* New data message: check what it is */
@@ -174,23 +172,14 @@ static void UserApp_SendMessage()
     {
       UserApp_u32DataMsgCount++;
       
-      /* Check if the new data is the same as the old data and update as we go */
-      bGotNewData = FALSE;
       for(u8 i = 0; i < ANT_APPLICATION_MESSAGE_BYTES; i++)
       {
-        if(G_au8AntApiCurrentData[i] != au8LastAntData[i])
-        {
-          bGotNewData = TRUE;
-          au8LastAntData[i] = G_au8AntApiCurrentData[i];
-
-          au8DataContent[2 * i] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] / 16);
-          au8DataContent[2 * i + 1] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] % 16); 
-        }
+        au8DataContent[2 * i] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] / 16);
+        au8DataContent[2 * i + 1] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] % 16); 
       }
+      LCDClearChars(LINE2_START_ADDR,20);
+      LCDMessage(LINE2_START_ADDR,au8DataContent);
       
-      if(bGotNewData)
-      {
-      } /* end if(bGotNewData) */
     } /* end if(G_eAntApiCurrentMessageClass == ANT_DATA) */
     
     else if(G_eAntApiCurrentMessageClass == ANT_TICK)
@@ -203,33 +192,78 @@ static void UserApp_SendMessage()
         /* The state changed so update u8LastState and queue a debug message */
         u8AntState = G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX];
       } /* end if (u8LastState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX]) */
+      
+      if(sPresentCMD.bValued)
+      {
+        bool bGetEnd = 0;
+        u8SendBuf[u8MsgPlace++] = sPresentCMD.u8DivAddr;
+        if(bIsFirstMsg)
+        {
+          bIsFirstMsg = 0;
+          u8SendBuf[u8MsgPlace++] = 0xFC;
+          u8SendBuf[u8MsgPlace++] = sPresentCMD.u8CMDType;
+        }
+        else
+        {
+          u8SendBuf[u8MsgPlace++] = 0xCC;
+        }
+        while(u8MsgPlace < 8)
+        {
+          if(sPresentCMD.u8CMDDetail[u8CMDCp] != 0xFF )
+          {
+            u8SendBuf[u8MsgPlace++] = sPresentCMD.u8CMDDetail[u8CMDCp++];
+          }
+          else
+          {
+            bGetEnd = 1;
+            u8CMDCp = 0;
+            u8SendBuf[u8MsgPlace] = 0xCF;
+            break;
+          }
+        }
+        if(bGetEnd)
+        {
+          bIsFirstMsg = 1;
+          sPresentCMD.bValued = 0;
+        }
+     
+        AntQueueBroadcastMessage(u8SendBuf);
+      }
+      
     } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
     
   } /* end AntReadData() */
 }
 static void UserApp_SearchingNewDiv()
 {
-  u8 u8TollMessage[] = {0,0,0,0,0,0,0,0};
+  static u8 u8TollMessage[] = {0,0,0,0,0,0,0,1};
+  static bool bGetNew = 0;
+  static bool bClk = 0;
+  static u8 au8DataContent[] = "xxxxxxxxxxxxxxxx";
   if( AntReadData() )
   {
+    bClk=!bClk;
      /* New data message: check what it is */
     if(G_eAntApiCurrentMessageClass == ANT_DATA)
     {
       UserApp_u32DataMsgCount++;
-      
-      if((G_au8AntApiCurrentData[0] == u8PairedCount) && (G_au8AntApiCurrentData[7] == 0xFF))
+      if((G_au8AntApiCurrentData[0] == 0) && (G_au8AntApiCurrentData[1] == u8PairedCount) &&(G_au8AntApiCurrentData[7] == 0xFF))
       {
-        u8TollMessage[0] = u8PairedCount++;
-        u8TollMessage[7] = 0xFF;
-        AntQueueBroadcastMessage(u8TollMessage);
+        u8PairedCount++;
       }
-      
+      for(u8 i = 0; i < ANT_APPLICATION_MESSAGE_BYTES; i++)
+      {
+        au8DataContent[2 * i] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] / 16);
+        au8DataContent[2 * i + 1] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] % 16); 
+      }
+      LCDClearChars(LINE2_START_ADDR,20);
+      LCDMessage(LINE2_START_ADDR,au8DataContent);
     } /* end if(G_eAntApiCurrentMessageClass == ANT_DATA) */
     
     else if(G_eAntApiCurrentMessageClass == ANT_TICK)
     {
       UserApp_u32TickMsgCount++;
-
+      
       /* Look at the TICK contents to check the event code and respond only if it's different */
       if(u8AntState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX])
       {
@@ -237,9 +271,19 @@ static void UserApp_SearchingNewDiv()
         u8AntState = G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX];
       } /* end if (u8LastState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX]) */
       
-      
       u8TollMessage[7] = u8PairedCount;
-      AntQueueBroadcastMessage(u8TollMessage);
+      u8TollMessage[6]++;
+      if(bClk)
+      {
+        u8TollMessage[0]=0;
+        AntQueueBroadcastMessage(u8TollMessage);
+       // bSendBefore=1;
+      }
+      else
+      {
+        u8TollMessage[0]=u8PairedCount;
+        AntQueueBroadcastMessage(u8TollMessage);
+      }
     } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
     
   } /* end AntReadData() */
@@ -281,7 +325,7 @@ static void CheckAntState()
 
     default:
     {
-      DebugPrintf("Unexpected Event\r\n");
+//      DebugPrintf("Unexpected Event\r\n");
       break;
     }
   } /* end switch (G_au8AntApiCurrentData) */
@@ -350,6 +394,16 @@ static void UserAppSM_WaitChannelOpen(void)
 
 static void UserAppSM_Idle(void)
 {
+  if( WasButtonPressed(BUTTON1) )
+  {
+    u8 u8TempString[] = "   Board Paired\n\r";
+    u8 u8TempReal = u8PairedCount -1;
+    u8TempString[0] = HexToASCIICharUpper(u8TempReal / 16);
+    u8TempString[1] = HexToASCIICharUpper(u8TempReal % 16); 
+    ButtonAcknowledge(BUTTON1);
+    DebugPrintf("\n\r");
+    DebugPrintf(u8TempString);
+  }
   if( WasButtonPressed(BUTTON0) )
   {
     ButtonAcknowledge(BUTTON0);
@@ -363,7 +417,7 @@ static void UserAppSM_Idle(void)
     UserApp_u32Timeout = G_u32SystemTime1ms;
     UserApp_StateMachine = UserAppSM_WaitChannelClose;
   }
-  else if(bGetNewCmd)
+  else if(sPresentCMD.bValued)
   {
     UserApp_SendMessage();
   }

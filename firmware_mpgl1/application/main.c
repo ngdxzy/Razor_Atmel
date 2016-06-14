@@ -54,7 +54,7 @@ void main(void)
   MessagingInitialize();
   UartInitialize();
   DebugInitialize();
-
+  CMD_Initialize();
   /* Debug messages through DebugPrintf() are available from here */
 
   SspInitialize();
@@ -86,6 +86,7 @@ void main(void)
     TWIRunActiveState();
     MessagingRunActiveState();
     DebugRunActiveState();
+    CMD_ActiveState();
     LcdRunActiveState();
     AntRunActiveState();
     SdCardRunActiveState();
