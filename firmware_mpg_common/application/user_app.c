@@ -276,19 +276,8 @@ static void UserAppSM_WaitChannelOpen(void)
 /* state UserAppSM_Idle,this state is the main state to run the programe */
 static void UserAppSM_Idle(void)
 {
-  LedOn(GREEN);
   /* If Button1 pressed show the paired device count */
-  if( WasButtonPressed(BUTTON1) )
-  {
-    u8 u8TempString[] = "   Board Paired\n\r";
-    u8 u8TempReal = u8PairedCount -1;
-    u8TempString[0] = HexToASCIICharUpper(u8TempReal / 16);
-    u8TempString[1] = HexToASCIICharUpper(u8TempReal % 16); 
-    ButtonAcknowledge(BUTTON1);
-    DebugPrintf("\n\r");
-    sPresentCMD.bValid = 0;
-    DebugPrintf(u8TempString);
-  }
+  
   /* If Button0 pressed ,close the channel */
   if( WasButtonPressed(BUTTON0) )
   {
@@ -496,11 +485,24 @@ static void UserAppSM_SearchingNewDiv()
   static bool bGetNew = 0;
   static bool bClk = 0;
   static u8 au8DataContent[] = "xxxxxxxxxxxxxxxx";
+  /* If button0 pressed,do not acknowledge it and go to idle for closing channel */
   if( WasButtonPressed(BUTTON0) )
   {
     LedOff(ORANGE);
     LedOn(GREEN);
     UserApp_StateMachine = UserAppSM_Idle;
+  }
+  /* If button1 pressed,show the number of devices connected */
+  if( WasButtonPressed(BUTTON1) )
+  {
+    u8 u8TempString[] = "   Board Paired\n\r";
+    u8 u8TempReal = u8PairedCount -1;
+    u8TempString[0] = HexToASCIICharUpper(u8TempReal / 16);
+    u8TempString[1] = HexToASCIICharUpper(u8TempReal % 16); 
+    ButtonAcknowledge(BUTTON1);
+    DebugPrintf("\n\r");
+    sPresentCMD.bValid = 0;
+    DebugPrintf(u8TempString);
   }
   if( AntReadData() )
   {
