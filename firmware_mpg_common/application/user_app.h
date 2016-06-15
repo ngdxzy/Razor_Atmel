@@ -35,11 +35,12 @@ Constants / Definitions
 #define ANT_DEVICE_TYPE_USERAPP         (u8)66                // 1 - 255
 #define ANT_TRANSMISSION_TYPE_USERAPP   (u8)2                 // 1-127 (MSB is pairing bit)
 #define ANT_CHANNEL_PERIOD_LO_USERAPP   (u8)0x00              // Low byte of two-byte channel period 0x0001 - 0x7fff
-#define ANT_CHANNEL_PERIOD_HI_USERAPP   (u8)0x20              // High byte of two-byte channel period 
+#define ANT_CHANNEL_PERIOD_HI_USERAPP   (u8)0x08              // High byte of two-byte channel period 
 #define ANT_FREQUENCY_USERAPP           (u8)66                // 2400MHz + this number 0 - 99
 #define ANT_TX_POWER_USERAPP            RADIO_TX_POWER_0DBM   // RADIO_TX_POWER_0DBM, RADIO_TX_POWER_MINUS5DBM, RADIO_TX_POWER_MINUS10DBM, RADIO_TX_POWER_MINUS20DBM
 
 #define TIMEOUT_VALUE 3000
+#define MAX_RESEND_TIMES 3
 /**********************************************************************************************************************
 Function Declarations
 **********************************************************************************************************************/
@@ -69,7 +70,9 @@ static void UserAppSM_Error(void);
 static void UserAppSM_FailedInit(void);        
 static void UserAppSM_Close(void);
 static void UserAppSM_WaitChannelOpen(void);
-
+static void UserAppSM_SendMessage();
+static void UserAppSM_SearchingNewDiv();
+static void UserAppSM_WaitForRspond();
 static void UserAppSM_Idle(void);
 static void UserAppSM_WaitChannelClose(void);
 #endif /* __USER_APP_H */

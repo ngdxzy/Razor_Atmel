@@ -72,8 +72,11 @@ static fnCode_type UserApp_StateMachine;            /* The state machine functio
 static u32 UserApp_u32Timeout;                      /* Timeout counter used across states */
 
 static u8 u8AntState = 0xff;
-
+/* Count the target packed in */
 u8 u8PairedCount = 1;
+bool bIsChannelOpen = 0;
+bool bResending = 0;
+u8 u8ResendTimes = 0;
 /**********************************************************************************************************************
 Function Definitions
 **********************************************************************************************************************/
@@ -121,7 +124,7 @@ void UserAppInitialize(void)
 
 
   /* If good initialization, set state to Idle */
-  if( AntChannelConfig(ANT_MASTER) )
+  if( AntChannelConfig(ANT_MASTER) )/* A valuable changed in the function AntChannelConfig() to set the channel type as shared master */
   {
     UserApp_StateMachine = UserAppSM_Close;
   }
@@ -158,137 +161,11 @@ void UserAppRunActiveState(void)
 /*--------------------------------------------------------------------------------------------------------------------*/
 /* Private functions                                                                                                  */
 /*--------------------------------------------------------------------------------------------------------------------*/
-static void UserApp_SendMessage()
-{
-  static u8 u8SendBuf[] = {0,0,0,0,0,0,0,0};
-  static u8 au8DataContent[] = "xxxxxxxxxxxxxxxx";
-  static bool bIsFirstMsg = 1;
-  u8 u8MsgPlace = 0;
-  static u8 u8CMDCp = 0;
-  if( AntReadData() )
-  {
-     /* New data message: check what it is */
-    if(G_eAntApiCurrentMessageClass == ANT_DATA)
-    {
-      UserApp_u32DataMsgCount++;
-      
-      for(u8 i = 0; i < ANT_APPLICATION_MESSAGE_BYTES; i++)
-      {
-        au8DataContent[2 * i] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] / 16);
-        au8DataContent[2 * i + 1] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] % 16); 
-      }
-      LCDClearChars(LINE2_START_ADDR,20);
-      LCDMessage(LINE2_START_ADDR,au8DataContent);
-      
-    } /* end if(G_eAntApiCurrentMessageClass == ANT_DATA) */
-    
-    else if(G_eAntApiCurrentMessageClass == ANT_TICK)
-    {
-      UserApp_u32TickMsgCount++;
 
-      /* Look at the TICK contents to check the event code and respond only if it's different */
-      if(u8AntState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX])
-      {
-        /* The state changed so update u8LastState and queue a debug message */
-        u8AntState = G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX];
-      } /* end if (u8LastState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX]) */
-      
-      if(sPresentCMD.bValued)
-      {
-        bool bGetEnd = 0;
-        u8SendBuf[u8MsgPlace++] = sPresentCMD.u8DivAddr;
-        if(bIsFirstMsg)
-        {
-          bIsFirstMsg = 0;
-          u8SendBuf[u8MsgPlace++] = 0xFC;
-          u8SendBuf[u8MsgPlace++] = sPresentCMD.u8CMDType;
-        }
-        else
-        {
-          u8SendBuf[u8MsgPlace++] = 0xCC;
-        }
-        while(u8MsgPlace < 8)
-        {
-          if(sPresentCMD.u8CMDDetail[u8CMDCp] != 0xFF )
-          {
-            u8SendBuf[u8MsgPlace++] = sPresentCMD.u8CMDDetail[u8CMDCp++];
-          }
-          else
-          {
-            bGetEnd = 1;
-            u8CMDCp = 0;
-            u8SendBuf[u8MsgPlace] = 0xCF;
-            break;
-          }
-        }
-        if(bGetEnd)
-        {
-          bIsFirstMsg = 1;
-          sPresentCMD.bValued = 0;
-        }
-     
-        AntQueueBroadcastMessage(u8SendBuf);
-      }
-      
-    } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
-    
-  } /* end AntReadData() */
-}
-static void UserApp_SearchingNewDiv()
-{
-  static u8 u8TollMessage[] = {0,0,0,0,0,0,0,1};
-  static bool bGetNew = 0;
-  static bool bClk = 0;
-  static u8 au8DataContent[] = "xxxxxxxxxxxxxxxx";
-  if( AntReadData() )
-  {
-    bClk=!bClk;
-     /* New data message: check what it is */
-    if(G_eAntApiCurrentMessageClass == ANT_DATA)
-    {
-      UserApp_u32DataMsgCount++;
-      if((G_au8AntApiCurrentData[0] == 0) && (G_au8AntApiCurrentData[1] == u8PairedCount) &&(G_au8AntApiCurrentData[7] == 0xFF))
-      {
-        u8PairedCount++;
-      }
-      for(u8 i = 0; i < ANT_APPLICATION_MESSAGE_BYTES; i++)
-      {
-        au8DataContent[2 * i] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] / 16);
-        au8DataContent[2 * i + 1] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] % 16); 
-      }
-      LCDClearChars(LINE2_START_ADDR,20);
-      LCDMessage(LINE2_START_ADDR,au8DataContent);
-    } /* end if(G_eAntApiCurrentMessageClass == ANT_DATA) */
-    
-    else if(G_eAntApiCurrentMessageClass == ANT_TICK)
-    {
-      UserApp_u32TickMsgCount++;
-      
-      /* Look at the TICK contents to check the event code and respond only if it's different */
-      if(u8AntState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX])
-      {
-        /* The state changed so update u8LastState and queue a debug message */
-        u8AntState = G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX];
-      } /* end if (u8LastState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX]) */
-      
-      u8TollMessage[7] = u8PairedCount;
-      u8TollMessage[6]++;
-      if(bClk)
-      {
-        u8TollMessage[0]=0;
-        AntQueueBroadcastMessage(u8TollMessage);
-       // bSendBefore=1;
-      }
-      else
-      {
-        u8TollMessage[0]=u8PairedCount;
-        AntQueueBroadcastMessage(u8TollMessage);
-      }
-    } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
-    
-  } /* end AntReadData() */
-}
 
+
+
+/* This function is setted to check the Tick Message to get the ant state*/
 static void CheckAntState()
 {
   switch (u8AntState)
@@ -329,14 +206,13 @@ static void CheckAntState()
       break;
     }
   } /* end switch (G_au8AntApiCurrentData) */
-}
+}//end of CheckAntState()
 
 /**********************************************************************************************************************
 State Machine Function Definitions
 **********************************************************************************************************************/
 
-/*-------------------------------------------------------------------------------------------------------------------*/
-/* Wait for a message to be queued */
+/* Channel closed,and if Button 0 pressed ,open the channel */
 static void UserAppSM_Close(void)
 {
   if(WasButtonPressed(BUTTON0))
@@ -353,7 +229,9 @@ static void UserAppSM_Close(void)
     UserApp_u32Timeout = G_u32SystemTime1ms;
     UserApp_StateMachine = UserAppSM_WaitChannelOpen;
   }
-}
+}//end of UserAppSM_Close(void)
+
+/* The state to wait the channel closes and if closed normolly,return to state UserAppSM_Close*/
 static void UserAppSM_WaitChannelClose(void)
 {
   /* Monitor the channel status to check if channel is closed */
@@ -361,6 +239,7 @@ static void UserAppSM_WaitChannelClose(void)
   {
     LedOff(GREEN);
     LedOn(YELLOW);
+    bIsChannelOpen = 0;
     UserApp_StateMachine = UserAppSM_Close;
   }
   
@@ -373,12 +252,15 @@ static void UserAppSM_WaitChannelClose(void)
     
     UserApp_StateMachine = UserAppSM_Error;
   }
-}
+}//end of UserAppSM_WaitChannelClose
+
+/* The state to wait the channel open and if opens normolly,return to state UserAppSM_Idle*/
 static void UserAppSM_WaitChannelOpen(void)
 {
   if(AntRadioStatus() == ANT_OPEN)
   {
     LedOn(GREEN);  
+    bIsChannelOpen = 1;
     UserApp_StateMachine = UserAppSM_Idle;
   }
   
@@ -390,10 +272,12 @@ static void UserAppSM_WaitChannelOpen(void)
     LedOn(YELLOW);  
     UserApp_StateMachine = UserAppSM_Close;
   }
-} /* end UserAppSM_Idle() */
-
+} /* end UserAppSM_WaitChannelOpen */
+/* state UserAppSM_Idle,this state is the main state to run the programe */
 static void UserAppSM_Idle(void)
 {
+  LedOn(GREEN);
+  /* If Button1 pressed show the paired device count */
   if( WasButtonPressed(BUTTON1) )
   {
     u8 u8TempString[] = "   Board Paired\n\r";
@@ -402,8 +286,10 @@ static void UserAppSM_Idle(void)
     u8TempString[1] = HexToASCIICharUpper(u8TempReal % 16); 
     ButtonAcknowledge(BUTTON1);
     DebugPrintf("\n\r");
+    sPresentCMD.bValid = 0;
     DebugPrintf(u8TempString);
   }
+  /* If Button0 pressed ,close the channel */
   if( WasButtonPressed(BUTTON0) )
   {
     ButtonAcknowledge(BUTTON0);
@@ -417,16 +303,270 @@ static void UserAppSM_Idle(void)
     UserApp_u32Timeout = G_u32SystemTime1ms;
     UserApp_StateMachine = UserAppSM_WaitChannelClose;
   }
-  else if(sPresentCMD.bValued)
+  else if(sPresentCMD.bValid)/* If user has not closed the channel and there being a CMD to send */
   {
-    UserApp_SendMessage();
+    LedOff(GREEN);
+    LedOn(RED);
+    UserApp_StateMachine = UserAppSM_SendMessage;
   }
-  else
+  else/* If user has not closed the channel and there being no CMDs to send */
   {
-    UserApp_SearchingNewDiv();
+    LedOff(GREEN);
+    LedOn(ORANGE);
+    UserApp_StateMachine = UserAppSM_SearchingNewDiv;
   }
   CheckAntState();
-}
+}/* end of UserAppSM_Idle */
+
+
+/* This state runs following the state UseApp_SMIdle accroding to the sPresentCMD.bValid */
+/* This function Send the CMD provided by Command.c following a format shown below */
+/* Addr msgHandle D0 D1 D2 D3 D4 D5 D6 */
+/* Addr is the address of the target device;
+  msgHandle is setted to show the information of the property of the following data ,
+  and 0xFC means it is the start of a CMD  ,and CC means this CMD is the rest of the last CMD,
+  and all CMD should be ended by a 0xCF;
+  D0~D6 is the data being sent;
+  */
+static void UserAppSM_SendMessage()
+{
+  static u8 au8SendBuf[] = {0,0,0,0,0,0,0,0};
+  static u8 au8DataContent[] = "xxxxxxxxxxxxxxxx";
+  static bool bIsFirstMsg = 1;
+  u8 u8MsgPlace = 0;
+  static u8 u8CMDCp = 0;
+  if( WasButtonPressed(BUTTON0) )
+  {
+    UserApp_StateMachine = UserAppSM_Idle;
+  }
+  if( AntReadData() )
+  {
+     /* New data message: check what it is */
+    if(G_eAntApiCurrentMessageClass == ANT_DATA)
+    {
+      UserApp_u32DataMsgCount++;
+      /* Show the data */
+      for(u8 i = 0; i < ANT_APPLICATION_MESSAGE_BYTES; i++)
+      {
+        au8DataContent[2 * i] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] / 16);
+        au8DataContent[2 * i + 1] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] % 16); 
+      }
+      LCDClearChars(LINE2_START_ADDR,20);
+      LCDMessage(LINE2_START_ADDR,au8DataContent);
+      
+    } /* end if(G_eAntApiCurrentMessageClass == ANT_DATA) */
+    
+    else if(G_eAntApiCurrentMessageClass == ANT_TICK)
+    {
+      UserApp_u32TickMsgCount++;
+
+      /* Look at the TICK contents to check the event code and respond only if it's different */
+      if(u8AntState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX])
+      {
+        /* The state changed so update u8LastState and queue a debug message */
+        u8AntState = G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX];
+      } /* end if (u8LastState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX]) */
+      
+      
+      /* If there being a CMD to send ,send it */
+      if(sPresentCMD.bValid)
+      {
+        bool bGetEnd = 0;
+        au8SendBuf[u8MsgPlace++] = sPresentCMD.u8DivAddr;
+        /* To stemp the head of the message */
+        if(bIsFirstMsg)
+        {
+          bIsFirstMsg = 0;
+          au8SendBuf[u8MsgPlace++] = 0xFC; 
+          au8SendBuf[u8MsgPlace++] = sPresentCMD.u8CMDType;
+        }
+        else/* if it's not a head ,send CC */
+        {
+          au8SendBuf[u8MsgPlace++] = 0xCC;
+        }
+        /* Keep circling when it comes to the end */
+        while(u8MsgPlace < 8)
+        {
+          if(sPresentCMD.u8CMDDetail[u8CMDCp] != 0xFF )
+          {
+            au8SendBuf[u8MsgPlace++] = sPresentCMD.u8CMDDetail[u8CMDCp++];
+          }
+          else
+          {
+            bGetEnd = 1;
+            u8CMDCp = 0;
+            au8SendBuf[u8MsgPlace] = 0xCF;
+            break;
+          }
+        }
+        /* If the CMD sended ,reset some variable */
+        if(bGetEnd)
+        {
+          bIsFirstMsg = 1;
+          LedOff(RED);
+          LedOn(BLUE);
+          UserApp_StateMachine = UserAppSM_WaitForRspond;
+        }
+     
+        AntQueueBroadcastMessage(au8SendBuf);
+      }
+      
+    } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
+    
+  } /* end AntReadData() */
+}//end of UserApp_SendMessage()
+
+/* This state runs when a message has been send to check whether it has been
+received correctly.It will wait 2s to receive the feedback from certain salve
+.If it does not received,than resend The message.But If a Message has been send
+for 3 times,there should be somethong odd,and print it on tera.
+*/
+static void UserAppSM_WaitForRspond()
+{
+  /* counters */
+  static u16 u16Counter = 0;
+  static u8 au8SendBuf[] = {0,0,0,0,0,0,0,0};
+  u16Counter++;
+  if( WasButtonPressed(BUTTON0) )
+  {
+    LedOff(ORANGE);
+    LedOn(GREEN);
+    UserApp_StateMachine = UserAppSM_Idle;
+  }
+  
+  if( AntReadData() )
+  {
+    if(G_eAntApiCurrentMessageClass == ANT_DATA)
+    {
+      /* Check the responding messgae */
+      UserApp_u32DataMsgCount++;
+      if(G_au8AntApiCurrentData[0] == sPresentCMD.u8DivAddr)
+      {
+        if(G_au8AntApiCurrentData[6] == 0x01)
+        {
+          u8ResendTimes = 0;
+          bResending = 0;
+          sPresentCMD.bValid = 0;
+          LedOff(BLUE);
+          LedOn(GREEN);
+          UserApp_StateMachine = UserAppSM_Idle;
+        }
+      }
+    } /* end if(G_eAntApiCurrentMessageClass == ANT_DATA) */
+    else if(G_eAntApiCurrentMessageClass == ANT_TICK)
+    {
+        UserApp_u32TickMsgCount++;
+        au8SendBuf[0] = sPresentCMD.u8DivAddr;
+        au8SendBuf[1] = 0xAC;
+        AntQueueBroadcastMessage(au8SendBuf);
+    } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
+    
+  } /* end AntReadData() */
+  /* If system has waitted 2s without any feedback,resend it */
+  if(u16Counter == 2000)
+  {
+    bResending = 1;
+    u16Counter = 0;
+    u8ResendTimes++;
+    DebugPrintf("Resend...\n\r");
+    LedOn(RED);
+    UserApp_StateMachine = UserAppSM_SendMessage;
+  }
+  /* If the Command has been resend for too many times */
+  if(u8ResendTimes == MAX_RESEND_TIMES)
+  {
+    u8ResendTimes = 0;
+    DebugPrintf("Failed to send the command,somethong wrong with the connection.\n\r");
+    sPresentCMD.bValid = 0;
+    LedOff(BLUE);
+    LedOn(GREEN);
+    UserApp_StateMachine = UserAppSM_Idle;
+  }
+}//end of UserAppSM_WaitForRspond
+
+/* This state runs following the state UseApp_SMIdle when there being no command t send.
+This function is searching for new unpaired device by broadcasting present avaiable address on
+shared address and broadcasting a sync message on the available address refered before to get paired
+to the new device.
+Once a new device get paired ,send a message to Tera and the available address will add 1
+*/
+static void UserAppSM_SearchingNewDiv()
+{
+  static u8 u8TollMessage[] = {0,0,0,0,0,0,0,1};
+  static bool bGetNew = 0;
+  static bool bClk = 0;
+  static u8 au8DataContent[] = "xxxxxxxxxxxxxxxx";
+  if( WasButtonPressed(BUTTON0) )
+  {
+    LedOff(ORANGE);
+    LedOn(GREEN);
+    UserApp_StateMachine = UserAppSM_Idle;
+  }
+  if( AntReadData() )
+  {
+    /* the message will be send on Public address and certian address on by one,
+        and the bClk is setted to realize it*/
+    bClk = !bClk;
+     /* New data message: check what it is */
+    if(G_eAntApiCurrentMessageClass == ANT_DATA)
+    {
+      UserApp_u32DataMsgCount++;
+      /* Received the message sended from the device trying to get paired,
+         than show is and add the u8PairedCount*/
+      if((G_au8AntApiCurrentData[0] == 0) && (G_au8AntApiCurrentData[1] == u8PairedCount) &&(G_au8AntApiCurrentData[7] == 0xFF))
+      {
+        u8 temp[] = "xx";
+        temp[0] = HexToASCIICharUpper(u8PairedCount / 16);
+        temp[1] = HexToASCIICharUpper(u8PairedCount % 16); 
+        DebugPrintf("\n\rA new target paired in and its address is :");
+        DebugPrintf(temp);
+        DebugPrintf("\n\r");
+        u8PairedCount++;
+      }
+      for(u8 i = 0; i < ANT_APPLICATION_MESSAGE_BYTES; i++)
+      {
+        au8DataContent[2 * i] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] / 16);
+        au8DataContent[2 * i + 1] = HexToASCIICharUpper(G_au8AntApiCurrentData[i] % 16); 
+      }
+      LCDClearChars(LINE2_START_ADDR,20);
+      LCDMessage(LINE2_START_ADDR,au8DataContent);
+    } /* end if(G_eAntApiCurrentMessageClass == ANT_DATA) */
+    
+    else if(G_eAntApiCurrentMessageClass == ANT_TICK)
+    {
+      UserApp_u32TickMsgCount++;
+      
+      /* Look at the TICK contents to check the event code and respond only if it's different */
+      if(u8AntState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX])
+      {
+        /* The state changed so update u8LastState and queue a debug message */
+        u8AntState = G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX];
+      } /* end if (u8LastState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX]) */
+      /* The last data is to show the available address */
+      u8TollMessage[7] = u8PairedCount;
+      /* This is a variable for slave to debug,and it does not have any meanings  */
+      u8TollMessage[6]++;
+      if(bClk)
+      {
+        u8TollMessage[0]=0;
+        AntQueueBroadcastMessage(u8TollMessage);
+       // bSendBefore=1;
+      }
+      else
+      {
+        u8TollMessage[0]=u8PairedCount;
+        AntQueueBroadcastMessage(u8TollMessage);
+      }
+    } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
+    
+  } /* end AntReadData() */
+  if(sPresentCMD.bValid)
+  {
+    LedOff(ORANGE);
+    LedOn(GREEN);
+    UserApp_StateMachine = UserAppSM_Idle;
+  }
+}//end of UserApp_SearchingNewDiv()
 /*-------------------------------------------------------------------------------------------------------------------*/
 /* Handle an error */
 static void UserAppSM_Error(void)          

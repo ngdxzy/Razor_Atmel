@@ -139,7 +139,7 @@
 //////////////////////////////////////////////
 // Response / Event Codes
 //////////////////////////////////////////////
-#define RESPONSE_NO_ERROR                          ((UCHAR)0x00)             
+#define  RESPONSE_NO_ERROR                          ((UCHAR)0x00)             
 
 #define EVENT_RX_SEARCH_TIMEOUT                    ((UCHAR)0x01)             
 #define EVENT_RX_FAIL                              ((UCHAR)0x02)             
