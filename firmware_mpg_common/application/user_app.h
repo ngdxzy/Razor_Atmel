@@ -71,7 +71,7 @@ static void UserAppSM_FailedInit(void);
 static void UserAppSM_Close(void);
 static void UserAppSM_WaitChannelOpen(void);
 static void UserAppSM_SendMessage();
-static void UserAppSM_SearchingNewDiv();
+static void UserAppSM_SearchingNewDev();
 static void UserAppSM_WaitForRspond();
 static void UserAppSM_Idle(void);
 static void UserAppSM_WaitChannelClose(void);

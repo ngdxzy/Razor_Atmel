@@ -7,12 +7,12 @@ static fnCode_type CMD_pfnStateMachine;
 /* Variables from other files */
 extern u8 G_au8DebugScanfBuffer[DEBUG_SCANF_BUFFER_SIZE]; /* From debug.c */
 extern volatile u8 G_u8DebugScanfCharCount; /* From debug.c */
-extern volatile u8 u8PairedCount;  /* From user_app.c */
-extern volatile bool bIsChannelOpen; /* From user_app.c */
+extern volatile u8 UserApp_u8PairedCount;  /* From user_app.c */
+extern volatile bool UserApp_bIsChannelOpen; /* From user_app.c */
 extern volatile bool bWaitResPond;  /* From user_app.c */
 /* Gloable variables define */
 bool bCommandFound = FALSE;
-CMD sPresentCMD = {FALSE,0,0,{0}};
+CMD G_sPresentCMD = {FALSE,0,0,{0}};
 bool bGetNewCmd = 0;
 
 /* Public functions define */
@@ -123,17 +123,17 @@ static void CMDSM_WaitCMD(void)
     u8CurrentByte = G_au8DebugScanfBuffer[G_u8DebugScanfCharCount];
   
   
-  if(bPrintBefore && !sPresentCMD.bValid)
+  if(bPrintBefore && !G_sPresentCMD.bValid)
   {
     bPrintBefore = 0;
     DebugPrintf("\n\rThe system is free,you can input now .\n\r");
   }
   /* Get new command as Enter was pressed , and the command will be reject when the program is sendding a command*/
-  if((u8CurrentByte == ASCII_CARRIAGE_RETURN) && !sPresentCMD.bValid)
+  if((u8CurrentByte == ASCII_CARRIAGE_RETURN) && !G_sPresentCMD.bValid)
   {
     
     /* Set the flag variable for next state to use. */
-    if(bIsChannelOpen)
+    if(UserApp_bIsChannelOpen)
     {
       bCommandFound = TRUE;
       CMD_pfnStateMachine = CMDSM_CheckCMD;
@@ -145,7 +145,7 @@ static void CMDSM_WaitCMD(void)
       DebugPrintf("\n\rThe channel has not be opend yet,you cannot send command now!\n\r");
     }
   }
-  else if(sPresentCMD.bValid && !bPrintBefore)
+  else if(G_sPresentCMD.bValid && !bPrintBefore)
   {
     bPrintBefore = 1;
     DebugPrintf("\n\rThe system is busy,please wait for a moment .\n\r");
@@ -194,7 +194,7 @@ static void CMDSM_CheckCMD(void)
     if(CheckValue(&G_au8DebugScanfBuffer[4]))
     {
       u8Temp = StringToHex(&G_au8DebugScanfBuffer[4]);
-      if(u8PairedCount <= u8Temp)
+      if(UserApp_u8PairedCount <= u8Temp)
         bCommandFound = 0;
     }
     else
@@ -238,15 +238,16 @@ it only screen out the helpful information and copy them to the struct CMD */
 static void CMDSM_BuildCMD()
 {
   u8 i = 0;
-  sPresentCMD.bValid = 1;
-  sPresentCMD.u8DivAddr = StringToHex(&G_au8DebugScanfBuffer[4]);
-  sPresentCMD.u8CMDType = StringToHex(&G_au8DebugScanfBuffer[7]);
+  G_sPresentCMD.bValid = 1;
+  G_sPresentCMD.u8DivAddr = StringToHex(&G_au8DebugScanfBuffer[4]);
+  G_sPresentCMD.u8CMDType = StringToHex(&G_au8DebugScanfBuffer[7]);
   while(G_au8DebugScanfBuffer[i + 10] != '\r')
   {
-    sPresentCMD.u8CMDDetail[i] = G_au8DebugScanfBuffer[i + 10];
+    G_sPresentCMD.u8CMDDetail[i] = G_au8DebugScanfBuffer[i + 10];
     i++;
   }
-  sPresentCMD.u8CMDDetail[i] = 0xFF;
+  /* 0xFF is the flag of the endding insteatd of '\0' because some data my include (char)0 */
+  G_sPresentCMD.u8CMDDetail[i] = 0xFF;
   /* reset the Scanf Buffer for checking new CMD */
   G_au8DebugScanfBuffer[0] = '\0';
   G_u8DebugScanfCharCount = 0;

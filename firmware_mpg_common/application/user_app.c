@@ -63,7 +63,7 @@ extern volatile u32 G_u32ApplicationFlags;             /* From main.c */
 extern volatile u32 G_u32SystemTime1ms;                /* From board-specific source file */
 extern volatile u32 G_u32SystemTime1s;                 /* From board-specific source file */
 
-extern volatile CMD sPresentCMD;
+extern volatile CMD G_sPresentCMD;
 /***********************************************************************************************************************
 Global variable definitions with scope limited to this local application.
 Variable names shall start with "UserApp_" and be declared as static.
@@ -73,10 +73,10 @@ static u32 UserApp_u32Timeout;                      /* Timeout counter used acro
 
 static u8 u8AntState = 0xff;
 /* Count the target packed in */
-u8 u8PairedCount = 1;
-bool bIsChannelOpen = 0;
-bool bResending = 0;
-u8 u8ResendTimes = 0;
+u8 UserApp_u8PairedCount = 1;
+bool UserApp_bIsChannelOpen = 0;
+bool UserApp_bResending = 0;
+u8 UserApp_u8ResendTimes = 0;
 /**********************************************************************************************************************
 Function Definitions
 **********************************************************************************************************************/
@@ -239,7 +239,7 @@ static void UserAppSM_WaitChannelClose(void)
   {
     LedOff(GREEN);
     LedOn(YELLOW);
-    bIsChannelOpen = 0;
+    UserApp_bIsChannelOpen = 0;
     UserApp_StateMachine = UserAppSM_Close;
   }
   
@@ -260,7 +260,7 @@ static void UserAppSM_WaitChannelOpen(void)
   if(AntRadioStatus() == ANT_OPEN)
   {
     LedOn(GREEN);  
-    bIsChannelOpen = 1;
+    UserApp_bIsChannelOpen = 1;
     UserApp_StateMachine = UserAppSM_Idle;
   }
   
@@ -292,7 +292,7 @@ static void UserAppSM_Idle(void)
     UserApp_u32Timeout = G_u32SystemTime1ms;
     UserApp_StateMachine = UserAppSM_WaitChannelClose;
   }
-  else if(sPresentCMD.bValid)/* If user has not closed the channel and there being a CMD to send */
+  else if(G_sPresentCMD.bValid)/* If user has not closed the channel and there being a CMD to send */
   {
     LedOff(GREEN);
     LedOn(RED);
@@ -302,13 +302,13 @@ static void UserAppSM_Idle(void)
   {
     LedOff(GREEN);
     LedOn(ORANGE);
-    UserApp_StateMachine = UserAppSM_SearchingNewDiv;
+    UserApp_StateMachine = UserAppSM_SearchingNewDev;
   }
   CheckAntState();
 }/* end of UserAppSM_Idle */
 
 
-/* This state runs following the state UseApp_SMIdle accroding to the sPresentCMD.bValid */
+/* This state runs following the state UseApp_SMIdle accroding to the G_sPresentCMD.bValid */
 /* This function Send the CMD provided by Command.c following a format shown below */
 /* Addr msgHandle D0 D1 D2 D3 D4 D5 D6 */
 /* Addr is the address of the target device;
@@ -358,16 +358,16 @@ static void UserAppSM_SendMessage()
       
       
       /* If there being a CMD to send ,send it */
-      if(sPresentCMD.bValid)
+      if(G_sPresentCMD.bValid)
       {
         bool bGetEnd = 0;
-        au8SendBuf[u8MsgPlace++] = sPresentCMD.u8DivAddr;
+        au8SendBuf[u8MsgPlace++] = G_sPresentCMD.u8DivAddr;
         /* To stemp the head of the message */
         if(bIsFirstMsg)
         {
           bIsFirstMsg = 0;
           au8SendBuf[u8MsgPlace++] = 0xFC; 
-          au8SendBuf[u8MsgPlace++] = sPresentCMD.u8CMDType;
+          au8SendBuf[u8MsgPlace++] = G_sPresentCMD.u8CMDType;
         }
         else/* if it's not a head ,send CC */
         {
@@ -376,9 +376,10 @@ static void UserAppSM_SendMessage()
         /* Keep circling when it comes to the end */
         while(u8MsgPlace < 8)
         {
-          if(sPresentCMD.u8CMDDetail[u8CMDCp] != 0xFF )
+          /* 0xFF is the flag of the endding insteatd of '\0' because some data my include (char)0 */
+          if(G_sPresentCMD.u8CMDDetail[u8CMDCp] != 0xFF )
           {
-            au8SendBuf[u8MsgPlace++] = sPresentCMD.u8CMDDetail[u8CMDCp++];
+            au8SendBuf[u8MsgPlace++] = G_sPresentCMD.u8CMDDetail[u8CMDCp++];
           }
           else
           {
@@ -429,13 +430,13 @@ static void UserAppSM_WaitForRspond()
     {
       /* Check the responding messgae */
       UserApp_u32DataMsgCount++;
-      if(G_au8AntApiCurrentData[0] == sPresentCMD.u8DivAddr)
+      if(G_au8AntApiCurrentData[0] == G_sPresentCMD.u8DivAddr)
       {
         if(G_au8AntApiCurrentData[6] == 0x01)
         {
-          u8ResendTimes = 0;
-          bResending = 0;
-          sPresentCMD.bValid = 0;
+          UserApp_u8ResendTimes = 0;
+          UserApp_bResending = 0;
+          G_sPresentCMD.bValid = 0;
           LedOff(BLUE);
           LedOn(GREEN);
           UserApp_StateMachine = UserAppSM_Idle;
@@ -445,7 +446,7 @@ static void UserAppSM_WaitForRspond()
     else if(G_eAntApiCurrentMessageClass == ANT_TICK)
     {
         UserApp_u32TickMsgCount++;
-        au8SendBuf[0] = sPresentCMD.u8DivAddr;
+        au8SendBuf[0] = G_sPresentCMD.u8DivAddr;
         au8SendBuf[1] = 0xAC;
         AntQueueBroadcastMessage(au8SendBuf);
     } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
@@ -454,19 +455,19 @@ static void UserAppSM_WaitForRspond()
   /* If system has waitted 2s without any feedback,resend it */
   if(u16Counter == 2000)
   {
-    bResending = 1;
+    UserApp_bResending = 1;
     u16Counter = 0;
-    u8ResendTimes++;
+    UserApp_u8ResendTimes++;
     DebugPrintf("Resend...\n\r");
     LedOn(RED);
     UserApp_StateMachine = UserAppSM_SendMessage;
   }
   /* If the Command has been resend for too many times */
-  if(u8ResendTimes == MAX_RESEND_TIMES)
+  if(UserApp_u8ResendTimes == MAX_RESEND_TIMES)
   {
-    u8ResendTimes = 0;
+    UserApp_u8ResendTimes = 0;
     DebugPrintf("Failed to send the command,somethong wrong with the connection.\n\r");
-    sPresentCMD.bValid = 0;
+    G_sPresentCMD.bValid = 0;
     LedOff(BLUE);
     LedOn(GREEN);
     UserApp_StateMachine = UserAppSM_Idle;
@@ -479,7 +480,7 @@ shared address and broadcasting a sync message on the available address refered 
 to the new device.
 Once a new device get paired ,send a message to Tera and the available address will add 1
 */
-static void UserAppSM_SearchingNewDiv()
+static void UserAppSM_SearchingNewDev()
 {
   static u8 u8TollMessage[] = {0,0,0,0,0,0,0,1};
   static bool bGetNew = 0;
@@ -496,12 +497,12 @@ static void UserAppSM_SearchingNewDiv()
   if( WasButtonPressed(BUTTON1) )
   {
     u8 u8TempString[] = "   Board Paired\n\r";
-    u8 u8TempReal = u8PairedCount -1;
+    u8 u8TempReal = UserApp_u8PairedCount -1;
     u8TempString[0] = HexToASCIICharUpper(u8TempReal / 16);
     u8TempString[1] = HexToASCIICharUpper(u8TempReal % 16); 
     ButtonAcknowledge(BUTTON1);
     DebugPrintf("\n\r");
-    sPresentCMD.bValid = 0;
+    G_sPresentCMD.bValid = 0;
     DebugPrintf(u8TempString);
   }
   if( AntReadData() )
@@ -514,16 +515,16 @@ static void UserAppSM_SearchingNewDiv()
     {
       UserApp_u32DataMsgCount++;
       /* Received the message sended from the device trying to get paired,
-         than show is and add the u8PairedCount*/
-      if((G_au8AntApiCurrentData[0] == 0) && (G_au8AntApiCurrentData[1] == u8PairedCount) &&(G_au8AntApiCurrentData[7] == 0xFF))
+         than show is and add the UserApp_u8PairedCount*/
+      if((G_au8AntApiCurrentData[0] == 0) && (G_au8AntApiCurrentData[1] == UserApp_u8PairedCount) &&(G_au8AntApiCurrentData[7] == 0xFF))
       {
         u8 temp[] = "xx";
-        temp[0] = HexToASCIICharUpper(u8PairedCount / 16);
-        temp[1] = HexToASCIICharUpper(u8PairedCount % 16); 
+        temp[0] = HexToASCIICharUpper(UserApp_u8PairedCount / 16);
+        temp[1] = HexToASCIICharUpper(UserApp_u8PairedCount % 16); 
         DebugPrintf("\n\rA new target paired in and its address is :");
         DebugPrintf(temp);
         DebugPrintf("\n\r");
-        u8PairedCount++;
+        UserApp_u8PairedCount++;
       }
       for(u8 i = 0; i < ANT_APPLICATION_MESSAGE_BYTES; i++)
       {
@@ -545,24 +546,25 @@ static void UserAppSM_SearchingNewDiv()
         u8AntState = G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX];
       } /* end if (u8LastState != G_au8AntApiCurrentData[ANT_TICK_MSG_EVENT_CODE_INDEX]) */
       /* The last data is to show the available address */
-      u8TollMessage[7] = u8PairedCount;
+      u8TollMessage[7] = UserApp_u8PairedCount;
       /* This is a variable for slave to debug,and it does not have any meanings  */
       u8TollMessage[6]++;
+      
+      /* Send the two kinds of the message. */
       if(bClk)
       {
         u8TollMessage[0]=0;
         AntQueueBroadcastMessage(u8TollMessage);
-       // bSendBefore=1;
       }
       else
       {
-        u8TollMessage[0]=u8PairedCount;
+        u8TollMessage[0]=UserApp_u8PairedCount;
         AntQueueBroadcastMessage(u8TollMessage);
       }
     } /* end else if(G_eAntApiCurrentMessageClass == ANT_TICK) */
     
   } /* end AntReadData() */
-  if(sPresentCMD.bValid)
+  if(G_sPresentCMD.bValid)
   {
     LedOff(ORANGE);
     LedOn(GREEN);
